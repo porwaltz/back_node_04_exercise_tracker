@@ -24,18 +24,24 @@ const UserSchema = new Schema({
 const User = mongoose.model("User", UserSchema)
 const Exercise = mongoose.model("Exercise", ExerciseSchema)
 
-
+//--------------------------------------------------------------------------------------------------
 //MIDDLEWARE
-
+//--------------------------------------------------------------------------------------------------
 app.use(cors())
 app.use(express.static('public'))
 app.use(bodyParser.urlencoded({extended: false}))
 app.use(bodyParser.json())
 
+
+
+//--------------------------------------------------------------------------------------------------
 //ENDPOINTS
+//--------------------------------------------------------------------------------------------------
+//base url
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
 })
+
 
 //post an user
 app.post('/api/users', (req, res) => {
@@ -54,6 +60,19 @@ app.post('/api/users', (req, res) => {
     }
   })
 })
+
+
+//get all users
+app.get("/api/users", (req, res) => {
+  User.find({}, (err, data) => {
+    if(!data){
+      res.send("No users")
+    }else{
+      res.json(data)
+    }
+  })
+})
+
 
 //post an exercise
 app.post('/api/users/:id/exercises', (req, res) => {
@@ -93,11 +112,52 @@ app.post('/api/users/:id/exercises', (req, res) => {
   })
 })
 
+app.get("/api/users/:id/logs", (req, res) => {
+  const { from, to, limit } = req.query;
+  const {id} = req.params;
+  User.findById(id, (err, userData) => {
+    if(err || !userData) {
+      res.send("Could not find user");
+    }else{
+      let dateObj = {}
+      if(from){
+        dateObj["$gte"] = new Date(from)
+      }
+      if(to){
+        dateObj["$lte"] = new Date(to)
+      }
+      let filter = {
+        userId: id
+      }
+      if(from || to ){
+        filter.date = dateObj
+      }
+      let nonNullLimit = limit ?? 500
+      Exercise.find(filter).limit(+nonNullLimit).exec((err, data) => {
+        if(err || !data){
+          res.json([])
+        }else{
+          const count = data.length
+          const rawLog = data
+          const {username, _id} = userData;
+          const log= rawLog.map((l) => ({
+            description: l.description,
+            duration: l.duration,
+            date: l.date.toDateString()
+          }))
+          res.json({username, count, _id, log})
+        }
+      })
+    } 
+  })
+})
 
 
 
 
+//--------------------------------------------------------------------------------------------------
 //PORT
+//--------------------------------------------------------------------------------------------------
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
 })
